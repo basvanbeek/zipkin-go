@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/openzipkin/zipkin-go/idgenerator"
+	"github.com/openzipkin/zipkin-go/log"
 	"github.com/openzipkin/zipkin-go/model"
 	"github.com/openzipkin/zipkin-go/propagation"
 	"github.com/openzipkin/zipkin-go/reporter"
@@ -23,6 +24,7 @@ type Tracer struct {
 	noop                 int32 // used as atomic bool (1 = true, 0 = false)
 	sharedSpans          bool
 	unsampledNoop        bool
+	logger               log.Logger
 }
 
 // NewTracer returns a new Zipkin Tracer.
@@ -38,6 +40,7 @@ func NewTracer(rep reporter.Reporter, opts ...TracerOption) (*Tracer, error) {
 		noop:                 0,
 		sharedSpans:          true,
 		unsampledNoop:        false,
+		logger:               log.NewNoopLogger(),
 	}
 
 	// if no reporter was provided we default to noop implementation.
@@ -51,6 +54,10 @@ func NewTracer(rep reporter.Reporter, opts ...TracerOption) (*Tracer, error) {
 		if err := opt(t); err != nil {
 			return nil, err
 		}
+	}
+
+	if r, ok := rep.(loggedReporter); ok {
+		r.SetLogger(t.logger)
 	}
 
 	return t, nil
@@ -148,6 +155,9 @@ func (t *Tracer) Extract(extractor propagation.Extractor) (sc model.SpanContext)
 		sc = *psc
 	}
 	sc.Err = err
+	if err != nil {
+		t.logger.Log("warning", "invalid span context received", "details", err)
+	}
 	return
 }
 
@@ -170,4 +180,8 @@ func (t *Tracer) LocalEndpoint() *model.Endpoint {
 	}
 	ep := *t.localEndpoint
 	return &ep
+}
+
+type loggedReporter interface {
+	SetLogger(log.Logger)
 }

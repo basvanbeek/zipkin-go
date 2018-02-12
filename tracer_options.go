@@ -2,8 +2,10 @@ package zipkin
 
 import (
 	"errors"
+	"log"
 
 	"github.com/openzipkin/zipkin-go/idgenerator"
+	zipkinlog "github.com/openzipkin/zipkin-go/log"
 	"github.com/openzipkin/zipkin-go/model"
 )
 
@@ -119,6 +121,24 @@ func WithNoopTracer(tracerNoop bool) TracerOption {
 		} else {
 			o.noop = 0
 		}
+		return nil
+	}
+}
+
+// WithLogger adds a structured logger for exceptions and errors. This logger
+// is Go kit Logger compatible.
+func WithLogger(logger zipkinlog.Logger) TracerOption {
+	return func(o *Tracer) error {
+		o.logger = logger
+		return nil
+	}
+}
+
+// WithDefaultLogger adds the Go standard logger for exceptions and errors. If
+// logger == nil a standard Logger is created.
+func WithDefaultLogger(logger *log.Logger) TracerOption {
+	return func(o *Tracer) error {
+		o.logger = zipkinlog.WrapStdLogger(logger)
 		return nil
 	}
 }

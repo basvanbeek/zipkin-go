@@ -12,6 +12,7 @@ import (
 	"sync"
 	"time"
 
+	zipkinlog "github.com/openzipkin/zipkin-go/log"
 	"github.com/openzipkin/zipkin-go/model"
 	"github.com/openzipkin/zipkin-go/reporter"
 )
@@ -28,7 +29,7 @@ const (
 type httpReporter struct {
 	url           string
 	client        *http.Client
-	logger        *log.Logger
+	logger        zipkinlog.Logger
 	batchInterval time.Duration
 	batchSize     int
 	maxBacklog    int
@@ -50,6 +51,10 @@ func (r *httpReporter) Send(s model.SpanModel) {
 func (r *httpReporter) Close() error {
 	close(r.quit)
 	return <-r.shutdown
+}
+
+func (r *httpReporter) SetLogger(logger zipkinlog.Logger) {
+	r.logger = logger
 }
 
 func (r *httpReporter) loop() {
@@ -90,7 +95,7 @@ func (r *httpReporter) append(span *model.SpanModel) (newBatchSize int) {
 	r.batch = append(r.batch, span)
 	if len(r.batch) > r.maxBacklog {
 		dispose := len(r.batch) - r.maxBacklog
-		r.logger.Printf("backlog too long, disposing %d spans", dispose)
+		r.logger.Log("warning", "span backlog too long", "disposed", dispose)
 		r.batch = r.batch[dispose:]
 	}
 	newBatchSize = len(r.batch)
